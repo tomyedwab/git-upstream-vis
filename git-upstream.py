@@ -53,10 +53,19 @@ for row in subprocess.check_output(["git", "branch", "-vv"]).split("\n"):
     branch_map[upstream_branch]["children"].append(branch_name)
 
 def _format_line(branch):
+    style = None
+    if branch["active"]:
+        style = "0;32"
+    elif branch["name"].endswith("[gone]"):
+        style = "0;31"
+    elif branch["name"].startswith("origin/"):
+        style = "0;34"
+
     line = [
         branch["name"],
         " *" if branch["active"] else "",
         "$",
+        "\x1b[%sm$" % style if style else "$",
         branch["commit_sha"],
         " ",
         branch["commit_message"],
@@ -83,6 +92,17 @@ root = {
 tree_lines = asciitree.LeftAligned()(root).split("\n")
 max_index = max([row.find("$") for row in tree_lines])
 tree_lines = map(
-    lambda row: row.split("$")[0].ljust(max_index+1) + row.split("$")[1],
+    lambda row: (
+        row.split("$")[0]
+            # Pad to the maximum width of the column up until the $
+            .ljust(max_index+1)
+            # Move styling to the front of the line
+            .replace(
+                "+--",
+                row.split("$")[1] + "+--") +
+        # Rest of the line, excluding style information
+        row.split("$")[2] +
+        # Clear styling at the end of the line
+        "\x1b[0m"),
     filter(lambda row: "$" in row, tree_lines))
 print "\n".join(tree_lines)
